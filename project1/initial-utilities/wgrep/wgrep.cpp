@@ -15,9 +15,9 @@ int main(int argc, char *argv[]){
     int fd;
     char buffer[4096];
     int ret;
+    int newline;
     int bytesRead;
     string line;
-    stringstream stringStream;
 
     //read stdin if no input file given (and is not terminal)
     if (argc == 1 && !isatty(STDIN_FILENO)){
@@ -35,11 +35,17 @@ int main(int argc, char *argv[]){
         */
         fd = open(argv[i], O_RDONLY);
         if (fd == -1){
-            cout << "wcat: cannot open file" << endl;
+            cout << "wgrep: cannot open file" << endl;
             return 1;
         } 
         while((bytesRead = read(fd, buffer, sizeof(buffer))) > 0){
-            ret = write(STDOUT_FILENO, buffer, bytesRead);
+            line += buffer;
+            //newline in buffer
+            if((newline == line.find_first_of('\n')) != string::npos){
+                 = line.substr(0, newline);
+                line = line.substr(newline);
+            };
+            ret = write(STDOUT_FILENO, line.c_str(), line.size());
             if (ret == -1){
                 cerr << "could not write to stdout." << endl;
                 return 1;
@@ -47,4 +53,8 @@ int main(int argc, char *argv[]){
         }
     }
     return 0;
+}
+
+bool hasString(){
+    
 }
