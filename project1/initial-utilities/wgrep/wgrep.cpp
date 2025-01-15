@@ -5,17 +5,21 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <sstream>
-#include <cstring>
+#include <string>
 
 using namespace std;
+
+//note: GNU grep uses boyer-moore algo-- look into this!
 
 int main(int argc, char *argv[]){
     int fd;
     char buffer[4096];
     int ret;
     int bytesRead;
+    string line;
     stringstream stringStream;
 
+    //read stdin if no input file given (and is not terminal)
     if (argc == 1 && !isatty(STDIN_FILENO)){
         fd = STDIN_FILENO; //this sets input to stdin if no file specified
         while((bytesRead = read(fd, buffer, sizeof(buffer))) > 0){
@@ -37,7 +41,7 @@ int main(int argc, char *argv[]){
             ret = write(STDOUT_FILENO, buffer, bytesRead);
             if (ret == -1){
                 cerr << "could not write to stdout." << endl;
-                return 1;ya
+                return 1;
             }
         }
     }

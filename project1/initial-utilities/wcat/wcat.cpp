@@ -4,8 +4,6 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
-#include <sstream>
-#include <cstring>
 
 using namespace std;
 
@@ -14,8 +12,8 @@ int main(int argc, char *argv[]){
     char buffer[4096];
     int ret;
     int bytesRead;
-    stringstream stringStream;
 
+    //isatty -- is interative input (i.e. terminal)
     if (argc == 1 && !isatty(STDIN_FILENO)){
         fd = STDIN_FILENO; //this sets input to stdin if no file specified
         while((bytesRead = read(fd, buffer, sizeof(buffer))) > 0){
@@ -40,6 +38,7 @@ int main(int argc, char *argv[]){
                 return 1;
             }
         }
+        close(fd);
     }
     return 0;
 }
