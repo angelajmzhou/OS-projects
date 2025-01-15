@@ -5,6 +5,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <sstream>
+#include <cstring>
 
 using namespace std;
 
@@ -16,7 +17,8 @@ int main(int argc, char *argv[]){
     else{
         fd = open(argv[1], O_RDONLY);
         if (fd == -1){
-            cerr << "Error opening " <<argv[1] << endl;
+        cerr << "Error opening file: " << argv[1] << " (" << strerror(errno) << ")" << endl;
+
             return 1;
         }
     }
