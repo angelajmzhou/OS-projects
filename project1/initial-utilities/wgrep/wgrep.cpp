@@ -22,16 +22,17 @@ int main(int argc, char *argv[]){
     //read stdin if no input file given (and is not terminal)
     if (argc == 1 && !isatty(STDIN_FILENO)){
         fd = STDIN_FILENO; //this sets input to stdin if no file specified
-        while((bytesRead = read(fd, buffer, sizeof(buffer))) > 0){
-            ret = write(STDOUT_FILENO, buffer, bytesRead);
-            if (ret == -1){
-                cerr << "could not write to stdout." << endl;
-                return 1;
-            }
-        }
     }
 
     for (int i = 1; i<argc; i++){
+        /*
+        overall logic: read into buffer, append to string
+        find newline char in string, get rid of all after that
+        then move filepointer back
+
+        then, for each string to be grep-d, see if it's in that line
+        if it is, print it out :3
+        */
         fd = open(argv[i], O_RDONLY);
         if (fd == -1){
             cout << "wcat: cannot open file" << endl;
