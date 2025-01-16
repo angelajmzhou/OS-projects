@@ -34,9 +34,6 @@ int main(int argc, char *argv[]){
 
              }
             }
-            if (!line.empty()) {
-                isitgreppy(line, argv[1]);
-            }
     } else{
         for (int i = 2; i<argc; i++){
             /*
@@ -62,9 +59,6 @@ int main(int argc, char *argv[]){
                 line = line.substr(nind+1);
 
              }
-            }
-            if (!line.empty()) {
-                isitgreppy(line, argv[1]);
             }
         } 
     }

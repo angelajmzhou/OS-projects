@@ -14,15 +14,8 @@ int main(int argc, char *argv[]){
     int bytesRead;
 
     //isatty -- is interative input (i.e. terminal)
-    if (argc == 1 && !isatty(STDIN_FILENO)){
-        fd = STDIN_FILENO; //this sets input to stdin if no file specified
-        while((bytesRead = read(fd, buffer, sizeof(buffer))) > 0){
-            ret = write(STDOUT_FILENO, buffer, bytesRead);
-            if (ret == -1){
-                cerr << "could not write to stdout." << endl;
-                return 1;
-            }
-        }
+    if (argc == 1){
+        return 0;
     }
 
     for (int i = 1; i<argc; i++){
