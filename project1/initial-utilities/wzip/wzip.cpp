@@ -25,7 +25,7 @@ int main(int argc, char *argv[]){
         
         for (int i = 1; i<argc; i++){
             /*
-            overall logic: read into buffIn, zip into buffOut 
+            overall logic: read into buffIn, zip into buffOut -- need it to treat input file stream as cts. 
             */
             fd = open(argv[i], O_RDONLY);
             if (fd == -1){
