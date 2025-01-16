@@ -34,6 +34,7 @@ int main(int argc, char *argv[]){
 
              }
             }
+
     } else{
         for (int i = 2; i<argc; i++){
             /*

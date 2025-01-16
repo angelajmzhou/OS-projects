@@ -14,11 +14,11 @@ using namespace std;
 int main(int argc, char *argv[]){
     int fd;
     char buffIn[1024];
-    char buffOut[2048];
+    char buffOut[SZ_BUFFOUT];
     uint32_t nchar;
     int bytesIn;
     int bytesOut = 0;
-    int ret;
+    char currch;
     
     if (argc == 1){
         cout<<"wunzip: file1 [file2 ...]"<<endl;
@@ -36,19 +36,25 @@ int main(int argc, char *argv[]){
             while((bytesIn = read(fd, buffIn, sizeof(buffIn))) > 0){
                 for(int i = 0; i<bytesIn; i+=5){
                     nchar = *(reinterpret_cast<uint32_t*>(&buffIn[i]));
-                    bytesOut += nchar;
-                    if(bytesOut >= SZ_BUFFOUT){
-                        ret = write(STDOUT_FILENO, buffOut, (bytesOut-nchar));
-                        if (ret == -1){
-                            cerr << "could not write to stdout." << endl;
+                    currch = buffIn[i+4];
+                    for(uint32_t j = 1; j<= nchar; j++){
+                        buffOut[bytesOut++] = currch;
+                    }
+                    if (bytesOut == SZ_BUFFOUT){
+                        if (write(STDOUT_FILENO, buffOut, bytesOut) == -1) {
+                            cerr << "wunzip: cannot write to stdout" << endl;
                             return 1;
                         }
                         bytesOut = 0;
                     }
-                    memset(buffOut, buffIn[i+4], nchar);
                 }
-        } 
-    }
+                if (write(STDOUT_FILENO, buffOut, bytesOut) == -1) {
+                        cerr << "wunzip: cannot write to stdout" << endl;
+                        return 1;
+                }
+                bytesOut = 0;
+            } 
+        }
     }
     return 0;
 }
