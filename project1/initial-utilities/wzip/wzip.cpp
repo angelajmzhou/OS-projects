@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
                     prevch = currch;
                     nchar = 1;
                     firstChar = false;
+                //keep track of continuous streams across files
                 } else if (currch == prevch) {
                     nchar++;
                 } else {
@@ -72,7 +73,7 @@ int main(int argc, char *argv[]) {
 
         close(fd);
     }
-
+    //flush remaining buffer
     if (!firstChar) {
         if (j + 5 > SZ_BUFFOUT) {
             if (write(STDOUT_FILENO, buffOut, j) == -1) {

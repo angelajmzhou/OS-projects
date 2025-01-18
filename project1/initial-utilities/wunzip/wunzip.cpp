@@ -38,7 +38,6 @@ int main(int argc, char *argv[]) {
                     if (bytesOut == SZ_BUFFOUT) {
                         if (write(STDOUT_FILENO, buffOut, bytesOut) == -1) {
                             cerr << "wunzip: cannot write to stdout" << endl;
-                            close(fd);
                             return 1;
                         }
                         bytesOut = 0;

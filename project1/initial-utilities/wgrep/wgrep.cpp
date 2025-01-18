@@ -50,17 +50,18 @@ int main(int argc, char *argv[]){
                 return 1;
             }
             while((bytesRead = read(fd, buffer, sizeof(buffer))) > 0){
-            line.append(buffer, bytesRead);
-            //nind in buffer
-            //runnign inf
-            while((nind = line.find_first_of('\n')) != string::npos){
-                if(!isitgreppy(line.substr(0, nind+1), argv[1])){
-                    return 1;
-                }
-                line = line.substr(nind+1);
+                line.append(buffer, bytesRead);
+                //nind in buffer
+                //runnign inf
+                while((nind = line.find_first_of('\n')) != string::npos){
+                    if(!isitgreppy(line.substr(0, nind+1), argv[1])){
+                        return 1;
+                    }
+                    line = line.substr(nind+1);
 
-             }
+                }
             }
+            close(fd);
         } 
     }
     return 0;
