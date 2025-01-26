@@ -16,7 +16,7 @@
 
 using namespace std;
 
-bool handleBuiltIn(string cmd);
+void handleBuiltIn(string cmd);
 void parseInput(string line);
 void parseCommand(string redir[], bool redirect);
 void checkRedirect(string line);
@@ -53,38 +53,33 @@ int main(int argc, char *argv[]){
 
 }
 
-bool handleBuiltIn(string cmd){
+void handleBuiltIn(string cmd){
     //handle our built-in commands
     istringstream iss(cmd);
     vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}}; 
-    if (tokens[0] == "exit"){
+    if (cmd == "exit"){
         if(tokens.size()==1){
             exit(0);
-        } else {
-            defaultError(); 
-            return true;
         }
+        defaultError(); 
     }
-    else if(tokens[0] == "cd"){
+    else if(cmd == "cd"){
         if(tokens.size()==2){
             if(chdir(tokens[1].c_str())==-1){
                 defaultError();
             }
-            return true;
         } else{
             defaultError(); 
-            return true;
         }
     }
-    else if(tokens[0] == "path"){
+    else if(cmd == "path"){
         //set search path(s) here
         paths.clear();
         for(long unsigned int i = 1; i<tokens.size(); i++){
             paths.push_back(tokens[i].c_str());
         }
-        return true;
+        
     }
-    return false;
 }
 
 void parseInput(string line){
@@ -95,15 +90,12 @@ void parseInput(string line){
     while (getline(ss, command, '&')) {
         commands.push_back(command);
     }
-    /*
+
 
     if(commands.size() == 1){
-        //not handled?
-        if(handleBuiltIn(commands[0])){
-            return;
-        }
+        handleBuiltIn(command);
     }
-    */
+
     for (long unsigned int i = 0; i < commands.size(); i++) {
         if (fork() == 0) {
             checkRedirect(commands[i]);
@@ -145,9 +137,7 @@ void parseCommand(string redir[], bool redirect){
         istringstream iss(redir[0]);
         vector<string> tokens{istream_iterator<string>{iss},
                       istream_iterator<string>{}}; 
-        if(tokens[0] == "exit" || tokens[0] == "cd" || tokens[0] == "path") {
-            handleBuiltIn(redir[0]);
-        }
+        if(tokens[0] == "exit" || tokens[0] == "cd" || tokens[0] == "path") {handleBuiltIn(redir[0]);}
         else{
             for(long unsigned int i = 0; i<paths.size(); i++){
                 char path[(strlen(paths[i]) + tokens[0].size() + 2)]; //+2 for backslash n null terminator
