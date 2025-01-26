@@ -57,7 +57,12 @@ bool handleBuiltIn(string cmd){
     //handle our built-in commands
     istringstream iss(cmd);
     vector<string> tokens{istream_iterator<string>{iss}, istream_iterator<string>{}}; 
-    if (tokens[0] == "exit"){
+
+    if (tokens[tokens.size()-1]==">"){
+        defaultError();
+        return true;
+    }
+    else if (tokens[0] == "exit"){
         if(tokens.size()==1){
             exit(0);
         } else {
@@ -95,7 +100,9 @@ void parseInput(string line){
     while (getline(ss, command, '&')) {
         commands.push_back(command);
     }
-
+    if (line.find_first_not_of(" \t\n") == string::npos) {
+        return; 
+    }
     if(commands.size() == 1){
         if(handleBuiltIn(commands[0])){
             return;
@@ -103,6 +110,9 @@ void parseInput(string line){
     }
     
     for (long unsigned int i = 0; i < commands.size(); i++) {
+        if (commands[i].find_first_not_of(" \t\n") == string::npos) {
+            return; 
+        }
         if (fork() == 0) {
             handleRedirect(commands[i]);
             exit(0);                 
@@ -120,11 +130,18 @@ void handleRedirect(string line){
     stringstream ss(line);
     string tokens[2];
     string tmp;
-    int pos = 0;
+    int pos;
+
+    pos = line.find_first_not_of(" \t\n");
+    if(line[pos]=='>'){
+        defaultError();
+        exit(0);
+    }
+    pos = 0;
     while (getline(ss,tmp, '>')) {
         if(pos>=2){
             defaultError();
-            return;
+            exit(0);
         }
         tokens[pos] = tmp;
         pos++;
@@ -143,11 +160,20 @@ void parseCommand(string redir[], bool redirect){
         istringstream iss(redir[0]);
         vector<string> tokens{istream_iterator<string>{iss},
                       istream_iterator<string>{}}; 
-        if(tokens[0] == "exit" || tokens[0] == "cd" || tokens[0] == "path") {
+        if(tokens.empty()){
+            defaultError();
+            return;
+        }
+        else if(tokens[0] == "exit" || tokens[0] == "cd" || tokens[0] == "path") {
             handleBuiltIn(redir[0]);
         }
         else{
             for(long unsigned int i = 0; i<paths.size(); i++){
+                if (tokens.empty() || tokens[0].find_first_not_of(" \t\n") == string::npos) {
+                    defaultError();
+                    return;
+                    //exit(0);
+                }
                 char path[(strlen(paths[i]) + tokens[0].size() + 2)]; //+2 for backslash n null terminator
                 snprintf(path, sizeof(path), "%s/%s", paths[i], tokens[0].c_str());
                 if(access(path, X_OK) == 0){ 
@@ -160,8 +186,17 @@ void parseCommand(string redir[], bool redirect){
                     if(fork() == 0){ //if child
                         //pointer to an constant pointer to a character
                         if(redirect){
-                            redir[1].erase(0, redir[1].find_first_not_of(" \t\n"));
-                            redir[1].erase(redir[1].find_last_not_of(" \t\n")+1); //trim whitespace
+                            if (redir[1].empty() || redir[1].find_first_not_of(" \t\n") == string::npos) {
+                                defaultError();
+                                exit(0);
+                            }
+                            istringstream issdir(redir[1]);
+                            vector<string> files{istream_iterator<string>{issdir},
+                                        istream_iterator<string>{}};
+                            if(files.size()>1){
+                                defaultError();
+                                exit(0);
+                            } 
                             int fd = open(redir[1].c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
                             if (fd < 0) {
                                 defaultError();
