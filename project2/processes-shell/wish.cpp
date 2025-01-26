@@ -19,7 +19,7 @@ using namespace std;
 bool handleBuiltIn(string cmd);
 void parseInput(string line);
 void parseCommand(string redir[], bool redirect);
-void checkRedirect(string line);
+void handleRedirect(string line);
 void defaultError();
 
 vector<const char *> paths = {"/bin"};
@@ -95,18 +95,16 @@ void parseInput(string line){
     while (getline(ss, command, '&')) {
         commands.push_back(command);
     }
-    /*
 
     if(commands.size() == 1){
-        //not handled?
         if(handleBuiltIn(commands[0])){
             return;
         }
     }
-    */
+    
     for (long unsigned int i = 0; i < commands.size(); i++) {
         if (fork() == 0) {
-            checkRedirect(commands[i]);
+            handleRedirect(commands[i]);
             exit(0);                 
         }
     }
@@ -118,7 +116,7 @@ void parseInput(string line){
     }
 }
 
-void checkRedirect(string line){
+void handleRedirect(string line){
     stringstream ss(line);
     string tokens[2];
     string tmp;
