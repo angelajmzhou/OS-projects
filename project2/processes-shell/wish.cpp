@@ -46,7 +46,34 @@ int main(int argc, char *argv[]){
     cout<<"wish> ";
     while(getline(cin, line)){
         cout<<"wish> ";
-        if(parseInput(line) == 1){break;}
+
+        stringstream ss(line);
+        vector<string> commands;
+        string command;
+        //https://www.geeksforgeeks.org/how-to-split-string-by-delimiter-in-cpp/
+        while(getline(ss, command, '&')){
+            commands.push_back(command);
+        }
+        
+        for (long unsigned int i = 0; i<commands.size(); i++){
+            if(fork()==0){
+                parseInput(commands[i]);
+                exit(0);
+            } else{}
+        }
+        for (long unsigned int idx = 0; idx<commands.size(); idx++){
+		  wait(NULL); 
+		  /*
+		  calling for each child we create
+		  more principled way: keep vector of process and child ID's, and wait
+		  for them to exit. but this had the exact effect.
+		  cannot assume parent always runs first!
+		  */
+	  }
+        //priority: split by ampersands, then split by redirect, then parse the commands...
+        if(parseInput(line) == 1){
+            defaultError();
+        }
     }
     exit(0);
 }
