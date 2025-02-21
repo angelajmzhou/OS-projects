@@ -29,7 +29,13 @@ string BASEDIR = "static";
 string SCHEDALG = "FIFO";
 string LOGFILE = "/dev/null";
 
+deque<MySocket *> buffer; //line 1
+
 vector<HttpService *> services;
+
+pthread_mutex_t dlock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t hasClient = PTHREAD_COND_INITIALIZER;
+pthread_cond_t notFull = PTHREAD_COND_INITIALIZER;
 
 HttpService *find_service(HTTPRequest *request) {
    // find a service that is registered for this path prefix
@@ -104,10 +110,26 @@ void handle_request(MySocket *client) {
   delete client;
 }
 
+void *issueThread(void *arg){
+  while(true){
+    dthread_mutex_lock(&dlock);
+    while(buffer.size() == 0){
+      dthread_cond_wait(&hasClient, &dlock);
+    }
+    MySocket *client = buffer.front();
+    buffer.pop_front();
+    dthread_cond_signal(&notFull);
+    dthread_mutex_unlock(&dlock);
+    handle_request(client);
+  }
+  return NULL;
+ }
+
 int main(int argc, char *argv[]) {
 
   signal(SIGPIPE, SIG_IGN);
   int option;
+
 
   while ((option = getopt(argc, argv, "d:p:t:b:s:l:")) != -1) {
     switch (option) {
@@ -135,11 +157,21 @@ int main(int argc, char *argv[]) {
     }
   }
 
+
   set_log_file(LOGFILE);
 
   sync_print("init", "");
+
   MyServerSocket *server = new MyServerSocket(PORT);
+
   MySocket *client;
+  vector<pthread_t> threads;
+  pthread_t threadId;
+
+  for(int i = 0; i<THREAD_POOL_SIZE; i++){
+    dthread_create(&threadId, NULL, issueThread, NULL);
+    threads.push_back(threadId);
+  }
 
   // The order that you push services dictates the search order
   // for path prefix matching
@@ -149,6 +181,12 @@ int main(int argc, char *argv[]) {
     sync_print("waiting_to_accept", "");
     client = server->accept();
     sync_print("client_accepted", "");
-    handle_request(client);
+    dthread_mutex_lock(&dlock);
+    while((int)buffer.size() == BUFFER_SIZE){
+      dthread_cond_wait(&notFull, &dlock);
+    }
+    buffer.push_back(client);
+    dthread_cond_broadcast(&hasClient);
+    dthread_mutex_unlock(&dlock);
   }
 }
