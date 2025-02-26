@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
-
+//this file handles security ~ nyah ~ :3
 #include <iostream>
 #include <map>
 #include <string>
@@ -34,8 +34,15 @@ bool FileService::endswith(string str, string suffix) {
 }
 
 void FileService::get(HTTPRequest *request, HTTPResponse *response) {
+
+  string relpath = request->getPath();
+  if(relpath.find("..") != string::npos){
+    response->setStatus(403);
+    return;
+  }
   string path = this->m_basedir + request->getPath();
   string fileContents = this->readFile(path);
+
   if (fileContents.size() == 0) {
     response->setStatus(403);
     return;

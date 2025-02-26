@@ -179,7 +179,6 @@ void parseCommand(string redir[], bool redirect){
                 char path[(paths[i].size() + tokens[0].size() + 2)]; //+2 for backslash n null terminator
                 snprintf(path, sizeof(path), "%s/%s", paths[i].c_str(), tokens[0].c_str());
 
-
                 if(access(path, X_OK) == 0){ 
                     const char* argsv[tokens.size() + 1]; //pointer to an array of constant chars
                     for (size_t j = 0; j < tokens.size(); j++) {
