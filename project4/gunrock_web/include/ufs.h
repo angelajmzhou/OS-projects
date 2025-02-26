@@ -17,7 +17,7 @@
 typedef struct {
     int type;   // UFS_DIRECTORY or UFS_REGULAR
     int size;   // bytes
-    unsigned int direct[DIRECT_PTRS];
+    unsigned int direct[DIRECT_PTRS];//30 entries x 4B each
 } inode_t;
 
 #define DIR_ENT_NAME_SIZE (28)

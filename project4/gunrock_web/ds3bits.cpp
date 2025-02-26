@@ -60,6 +60,5 @@ int main(int argc, char *argv[]) {
   //memory cleanup
   delete disk;
   delete fileSystem;
-  delete super;
   return 0;
 }

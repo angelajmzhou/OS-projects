@@ -10,8 +10,6 @@
 using namespace std;
 
 
-// 1. implement readSuperBLock, readInodeBitmap, readDataBitmap
-
 LocalFileSystem::LocalFileSystem(Disk *disk) {
   this->disk = disk;
 }
@@ -67,13 +65,44 @@ void LocalFileSystem::readInodeRegion(super_t *super, inode_t *inodes) {
 void LocalFileSystem::writeInodeRegion(super_t *super, inode_t *inodes) {
 
 }
-
+/**
+   * Lookup an inode.
+   *
+   * Takes the parent inode number (which should be the inode number
+   * of a directory) and looks up the entry name in it. The inode
+   * number of name is returned.
+   *
+   * Success: return inode number of name
+   * Failure: return -ENOTFOUND, -EINVALIDINODE.
+   * Failure modes: invalid parentInodeNumber, name does not exist.
+   */
 int LocalFileSystem::lookup(int parentInodeNumber, string name) {
+  inode_t *inode= new inode_t();
+  if(stat(parentInodeNumber, inode)==EINVALIDINODE) return EINVALIDINODE;
+  if(inode->type != UFS_DIRECTORY) return ENOTFOUND;
+
+  unsigned int direct[DIRECT_PTRS]; 
+  memcpy(direct, inode->direct, sizeof(direct));  // Copy data
+
+  
+
+
   return 0;
 }
 
+
 int LocalFileSystem::stat(int inodeNumber, inode_t *inode) {
-  //do this after finishing ds3bits
+  super_t *super = new super_t();
+  readSuperBlock(super);
+  if(inodeNumber > super->num_inodes || inodeNumber < 1){
+    return EINVALIDINODE;
+  }
+  //return -EINVALIDINODE upon failure, failure mode "invalid inodeNumber"
+  char buf[4096];
+  int block_num = inodeNumber/32; //4096B / 128B = 32 inode entries/block
+  int offset = inodeNumber%32;
+  (*this->disk).readBlock(block_num, buf); 
+  memcpy(inode, buf+offset, sizeof(inode_t));
   return 0;
 }
 
