@@ -88,8 +88,6 @@ int main(int argc, char *argv[]) {
     delete[] buf;
   }
   else{
-    //it's reading inode wrong!!!
-    cout<<"is not directory: "<<inode->type<<endl;
     cout<<inode_num<<"\t"<<token<<endl;
   }
   delete fileSystem;

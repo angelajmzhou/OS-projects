@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     cout << (unsigned int) Dbitmap[idx] << " ";
   }
   
-  cout<<"\n"<<endl;
+  cout<<endl;
 
   //memory cleanup
   delete disk;
