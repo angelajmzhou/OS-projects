@@ -43,18 +43,54 @@ int main(int argc, char *argv[]) {
   LocalFileSystem *fileSystem = new LocalFileSystem(disk);
   string directory = string(argv[2]);
 
+  int inode_num = 0;
 
   istringstream iss(directory);
   vector<std::string> tokens;
   string token;
 
-  while (getline(iss, token, '/')) {
-      tokens.push_back(token);
+  if(directory != "/"){
+    cout<<"parsing filepath"<<endl;
+    while (getline(iss, token, '/')) {
+        tokens.push_back(token);
+    }
+
+    int inode_num = 0;
+
+    for (auto& token : tokens) {
+      inode_num = fileSystem->lookup(inode_num, token); //start at root of filesystem
+      if (inode_num == EINVALIDINODE || inode_num == ENOTFOUND){
+        cerr<<"Directory not found"<<endl;
+        return 1;
+      }
+    }
   }
 
-  for (auto& token : tokens) {
-    fileSystem->lookup(0, token);
+  inode_t *inode = new inode_t();
+  fileSystem->stat(inode_num, inode);
+
+  if(inode->type == UFS_DIRECTORY){
+    int dirSize = inode->size;
+    char buf[dirSize];
+    vector<dir_ent_t> dir_entries(dirSize/32);
+    //read the block containing dir_ent_t
+    fileSystem->read(inode_num, buf, dirSize);
+    //read chunks of 32b as dir_ent_t
+    for(int i = 0; i<dirSize; i+=32){
+      memcpy(&dir_entries[i], buf+i, sizeof(dir_ent_t));
+    }
+      
+    sort(dir_entries.begin(), dir_entries.end(), compareByName);
+    for(auto& dir_entry : dir_entries){
+      cout<<dir_entry.name<<endl;
+    }
   }
-  
+  else{
+    cout<<"is not directory: "<<inode->type<<endl;
+    cout<<inode_num<<"\t"<<token<<endl;
+  }
+  delete fileSystem;
+  delete disk;
+  delete inode;
   return 0;
 }

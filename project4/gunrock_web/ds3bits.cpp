@@ -35,8 +35,7 @@ int main(int argc, char *argv[]) {
 
   //print out inode bitmap
   cout<<"Inode bitmap"<<endl;
-  int IBS = (super->num_inodes);
-  IBS = IBS % 8 ? IBS+1 : IBS; 
+  int IBS = (super->num_inodes + 7) / 8; 
   unsigned char Ibitmap[IBS];
   fileSystem->readInodeBitmap(super, Ibitmap);
   for (int idx =0; idx<IBS; idx++){
@@ -47,8 +46,7 @@ int main(int argc, char *argv[]) {
 
   //print out data bitmap
   cout<<"Data bitmap"<<endl;
-  int DBS = (super->num_inodes);
-  DBS = DBS % 8 ? DBS+1 : DBS; 
+  int DBS = (super->num_data + 7) / 8; 
   unsigned char Dbitmap[DBS];
   fileSystem->readDataBitmap(super, Dbitmap);
   for (int idx =0; idx<DBS; idx++){
@@ -60,5 +58,6 @@ int main(int argc, char *argv[]) {
   //memory cleanup
   delete disk;
   delete fileSystem;
+  delete super;
   return 0;
 }

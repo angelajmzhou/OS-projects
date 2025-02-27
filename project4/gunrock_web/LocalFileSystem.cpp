@@ -23,14 +23,16 @@ void LocalFileSystem::readSuperBlock(super_t *super) {
   // Helper functions, you should read/write the entire inode and bitmap regions
 
 void LocalFileSystem::readInodeBitmap(super_t *super, unsigned char *inodeBitmap) {
-  char buf[UFS_BLOCK_SIZE];
-
+  char buf[UFS_BLOCK_SIZE]; 
+  int bytes = (super->num_inodes+7)/8;
+  bytes = bytes%UFS_BLOCK_SIZE?bytes:UFS_BLOCK_SIZE; 
+  
+  //calculate leftover bytes from last block
   for (int i = 0; i < super->inode_bitmap_len; i++) {
     (*this->disk).readBlock(super->inode_bitmap_addr + i, buf); 
 
     //handle last block
     if(i==super->inode_bitmap_len-1){
-      int bytes = (super->num_inodes)%UFS_BLOCK_SIZE? (super->num_inodes)%UFS_BLOCK_SIZE : UFS_BLOCK_SIZE;
       memcpy(inodeBitmap + (i * UFS_BLOCK_SIZE), buf, bytes); 
       break;
     }
@@ -44,10 +46,15 @@ void LocalFileSystem::writeInodeBitmap(super_t *super, unsigned char *inodeBitma
 
 void LocalFileSystem::readDataBitmap(super_t *super, unsigned char *dataBitmap) {
   char buf[UFS_BLOCK_SIZE];
+
+  //calculate leftover bytes from last block
+  int bytes = (super->num_data+7)/8; //BYTES not bits smh my head
+  bytes = bytes%UFS_BLOCK_SIZE?bytes:UFS_BLOCK_SIZE; 
+
   for (int i = 0; i < super->data_bitmap_len; i++) {
     (*this->disk).readBlock(super->data_bitmap_addr + i, buf); 
+    //handle last block
     if(i==super->inode_bitmap_len-1){
-      int bytes = (super->num_data)%UFS_BLOCK_SIZE? (super->num_data)%UFS_BLOCK_SIZE : UFS_BLOCK_SIZE;
       memcpy(dataBitmap + (i * UFS_BLOCK_SIZE), buf, bytes); 
       break;
     }
@@ -81,8 +88,15 @@ int LocalFileSystem::lookup(int parentInodeNumber, string name) {
   inode_t *inode= new inode_t();
 
   //error checking
-  if(stat(parentInodeNumber, inode)==EINVALIDINODE) return EINVALIDINODE;
-  if(inode->type != UFS_DIRECTORY) return ENOTFOUND;
+  if(stat(parentInodeNumber, inode)==EINVALIDINODE) {
+    delete inode;
+    return EINVALIDINODE;
+  }
+  if(inode->type != UFS_DIRECTORY){ 
+    delete inode;
+    return ENOTFOUND;
+  }
+
 
   int dirSize = inode->size;
   char buf[dirSize];
@@ -92,11 +106,13 @@ int LocalFileSystem::lookup(int parentInodeNumber, string name) {
   dir_ent_t *dir = new dir_ent_t();
   //read chunks of 32b as dir_ent_t
   for(int i = 0; i<dirSize; i+=32){
-    memcpy(dir, buf+i, sizeof(dir_ent_t));
+    memcpy(dir, buf+(32*i), sizeof(dir_ent_t));
     if(dir->name == name){
       return dir->inum;
     }
   }
+  delete inode;
+  delete dir;
   return ENOTFOUND;
 }
 
@@ -113,14 +129,31 @@ int LocalFileSystem::lookup(int parentInodeNumber, string name) {
 int LocalFileSystem::stat(int inodeNumber, inode_t *inode) {
   super_t *super = new super_t();
   readSuperBlock(super);
-  if(inodeNumber > super->num_inodes || inodeNumber < 1){
+  //max inodes
+  if(inodeNumber >= super->num_inodes || inodeNumber < 0){
+    delete super;
     return EINVALIDINODE;
   }
+
+  //check if inode is valid in bitmap
+  int byteBlock = inodeNumber/8;
+  int bitPos = inodeNumber%8;
+  unsigned char bit = 1 << bitPos;
+  unsigned char readBit[((super->num_inodes + 7) / 8)];
+  readInodeBitmap(super, readBit);
+  if (!(readBit[byteBlock] & bit)){
+    delete super;
+    return EINVALIDINODE;
+  }
+
+  //if valid, fill inode struct 
   char buf[UFS_BLOCK_SIZE];
-  int block_num = inodeNumber/32; //UFS_BLOCK_SIZEB / 128B = 32 inode entries/block
-  int offset = inodeNumber%32;
+  int block_num = (super->inode_bitmap_addr) + (inodeNumber/32); //UFS_BLOCK_SIZEB / 128B = 32 inode entries/block
+  int offset = (inodeNumber%32) * sizeof(inode_t);
   (*this->disk).readBlock(block_num, buf); 
   memcpy(inode, buf+offset, sizeof(inode_t));
+
+  delete super;
   return 0;
 }
 
@@ -154,10 +187,12 @@ int LocalFileSystem::read(int inodeNumber, void *buffer, int size) {
   for (int i = 0; i < num_blocks; i++) {
     (*this->disk).readBlock(direct[i], buf); 
     if(i==num_blocks-1){
-      memcpy(buffer + (i * UFS_BLOCK_SIZE), buf, last_bytes_read); 
+      memcpy(static_cast<char*>(buffer) + (i * UFS_BLOCK_SIZE), buf, last_bytes_read);
+
       break;
     }
-    memcpy(buffer + (i * UFS_BLOCK_SIZE), buf, UFS_BLOCK_SIZE); 
+    memcpy(static_cast<char*>(buffer) + (i * UFS_BLOCK_SIZE), buf, UFS_BLOCK_SIZE);
+
   }
   return size;
 }
