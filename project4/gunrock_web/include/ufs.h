@@ -15,9 +15,13 @@
 // Note: Bitmap indexes identify disk blocks relative to the start of a region.
 
 typedef struct {
+    //size will mutate
+    //type does not change unless you delete then reallocate as a different type
     int type;   // UFS_DIRECTORY or UFS_REGULAR
     int size;   // bytes
     unsigned int direct[DIRECT_PTRS];//30 entries x 4B each
+    //array of disk blocks used to store data in file
+    //each index into array in file order, but disk blocks can be anywhere
 } inode_t;
 
 #define DIR_ENT_NAME_SIZE (28)

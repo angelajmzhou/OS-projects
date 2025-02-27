@@ -3,6 +3,7 @@
 #include <vector>
 #include <assert.h>
 #include <cstring>
+#include <type_traits>
 
 #include "LocalFileSystem.h"
 #include "ufs.h"
@@ -15,25 +16,25 @@ LocalFileSystem::LocalFileSystem(Disk *disk) {
 }
 
 void LocalFileSystem::readSuperBlock(super_t *super) {
-  char buf[4096];
+  char buf[UFS_BLOCK_SIZE];
   (*this->disk).readBlock(UFS_ROOT_DIRECTORY_INODE_NUMBER, buf);
   memcpy(super, buf, sizeof(super_t)); 
 }
   // Helper functions, you should read/write the entire inode and bitmap regions
 
 void LocalFileSystem::readInodeBitmap(super_t *super, unsigned char *inodeBitmap) {
-  char buf[4096];
+  char buf[UFS_BLOCK_SIZE];
 
   for (int i = 0; i < super->inode_bitmap_len; i++) {
     (*this->disk).readBlock(super->inode_bitmap_addr + i, buf); 
 
     //handle last block
     if(i==super->inode_bitmap_len-1){
-      int bytes = (super->num_inodes)%4096? (super->num_inodes)%4096 : 4096;
-      memcpy(inodeBitmap + (i * 4096), buf, bytes); 
+      int bytes = (super->num_inodes)%UFS_BLOCK_SIZE? (super->num_inodes)%UFS_BLOCK_SIZE : UFS_BLOCK_SIZE;
+      memcpy(inodeBitmap + (i * UFS_BLOCK_SIZE), buf, bytes); 
       break;
     }
-    memcpy(inodeBitmap + (i * 4096), buf, 4096); 
+    memcpy(inodeBitmap + (i * UFS_BLOCK_SIZE), buf, UFS_BLOCK_SIZE); 
   }
 }
 
@@ -42,15 +43,15 @@ void LocalFileSystem::writeInodeBitmap(super_t *super, unsigned char *inodeBitma
 }
 
 void LocalFileSystem::readDataBitmap(super_t *super, unsigned char *dataBitmap) {
-  char buf[4096];
+  char buf[UFS_BLOCK_SIZE];
   for (int i = 0; i < super->data_bitmap_len; i++) {
     (*this->disk).readBlock(super->data_bitmap_addr + i, buf); 
     if(i==super->inode_bitmap_len-1){
-      int bytes = (super->num_data)%4096? (super->num_data)%4096 : 4096;
-      memcpy(dataBitmap + (i * 4096), buf, bytes); 
+      int bytes = (super->num_data)%UFS_BLOCK_SIZE? (super->num_data)%UFS_BLOCK_SIZE : UFS_BLOCK_SIZE;
+      memcpy(dataBitmap + (i * UFS_BLOCK_SIZE), buf, bytes); 
       break;
     }
-    memcpy(dataBitmap + (i * 4096), buf, 4096); 
+    memcpy(dataBitmap + (i * UFS_BLOCK_SIZE), buf, UFS_BLOCK_SIZE); 
   }
 }
 
@@ -78,36 +79,87 @@ void LocalFileSystem::writeInodeRegion(super_t *super, inode_t *inodes) {
    */
 int LocalFileSystem::lookup(int parentInodeNumber, string name) {
   inode_t *inode= new inode_t();
+
+  //error checking
   if(stat(parentInodeNumber, inode)==EINVALIDINODE) return EINVALIDINODE;
   if(inode->type != UFS_DIRECTORY) return ENOTFOUND;
 
-  unsigned int direct[DIRECT_PTRS]; 
-  memcpy(direct, inode->direct, sizeof(direct));  // Copy data
-
+  int dirSize = inode->size;
+  char buf[dirSize];
+  //read the block containing dir_ent_t
+  read(parentInodeNumber, buf, dirSize);
   
-
-
-  return 0;
+  dir_ent_t *dir = new dir_ent_t();
+  //read chunks of 32b as dir_ent_t
+  for(int i = 0; i<dirSize; i+=32){
+    memcpy(dir, buf+i, sizeof(dir_ent_t));
+    if(dir->name == name){
+      return dir->inum;
+    }
+  }
+  return ENOTFOUND;
 }
 
-
+/**
+   * Read an inode.
+   *
+   * Given an inodeNumber this function will fill in the `inode` struct with
+   * the type of the entry and the size of the data, in bytes, and direct blocks.
+   *
+   * Success: return 0
+   * Failure: return -EINVALIDINODE
+   * Failure modes: invalid inodeNumber
+   */
 int LocalFileSystem::stat(int inodeNumber, inode_t *inode) {
   super_t *super = new super_t();
   readSuperBlock(super);
   if(inodeNumber > super->num_inodes || inodeNumber < 1){
     return EINVALIDINODE;
   }
-  //return -EINVALIDINODE upon failure, failure mode "invalid inodeNumber"
-  char buf[4096];
-  int block_num = inodeNumber/32; //4096B / 128B = 32 inode entries/block
+  char buf[UFS_BLOCK_SIZE];
+  int block_num = inodeNumber/32; //UFS_BLOCK_SIZEB / 128B = 32 inode entries/block
   int offset = inodeNumber%32;
   (*this->disk).readBlock(block_num, buf); 
   memcpy(inode, buf+offset, sizeof(inode_t));
   return 0;
 }
 
+/**
+   * Read the contents of a file or directory.
+   *
+   * Reads up to `size` bytes of data into the buffer from file specified by
+   * inodeNumber. The routine should work for either a file or directory;
+   * directories should return data in the format specified by dir_ent_t.
+   *
+   * Success: number of bytes read
+   * Failure: -EINVALIDINODE, -EINVALIDSIZE.
+   * Failure modes: invalid inodeNumber, invalid size.
+*/
+
 int LocalFileSystem::read(int inodeNumber, void *buffer, int size) {
-  return 0;
+  inode_t *inode= new inode_t();
+  if(stat(inodeNumber, inode)==EINVALIDINODE) return EINVALIDINODE; 
+  
+  char buf[UFS_BLOCK_SIZE];
+
+  unsigned int *direct = inode->direct;
+
+  if (size>inode->size || size == 0) return EINVALIDSIZE;
+
+  //calculate # blocks to read
+  int num_blocks = (size+(UFS_BLOCK_SIZE-1))/UFS_BLOCK_SIZE;
+  //calcuate bytes to read from the last block
+  int last_bytes_read = size%UFS_BLOCK_SIZE?size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
+
+  for (int i = 0; i < num_blocks; i++) {
+    (*this->disk).readBlock(direct[i], buf); 
+    if(i==num_blocks-1){
+      memcpy(buffer + (i * UFS_BLOCK_SIZE), buf, last_bytes_read); 
+      break;
+    }
+    memcpy(buffer + (i * UFS_BLOCK_SIZE), buf, UFS_BLOCK_SIZE); 
+  }
+  return size;
 }
 
 int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
