@@ -45,20 +45,22 @@ int main(int argc, char *argv[]) {
 
   int inode_num = 0;
 
-  istringstream iss(directory);
-  vector<std::string> tokens;
-  string token="/";
+  string token="";
 
   if(directory != "/"){
-    cout<<"parsing filepath"<<endl;
+    directory=directory.substr(1);
+    istringstream iss(directory);
+    vector<std::string> tokens;
     while (getline(iss, token, '/')) {
         tokens.push_back(token);
     }
-
-    for (auto& token : tokens) {
+    for (auto token : tokens) {
       inode_num = fileSystem->lookup(inode_num, token); //start at root of filesystem
       if (inode_num == -EINVALIDINODE || inode_num == -ENOTFOUND){
         cerr<<"Directory not found"<<endl;
+        delete fileSystem;
+        delete disk;
+
         return 1;
       }
     }

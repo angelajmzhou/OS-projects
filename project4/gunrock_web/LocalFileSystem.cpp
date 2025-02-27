@@ -106,9 +106,12 @@ int LocalFileSystem::lookup(int parentInodeNumber, string name) {
   dir_ent_t *dir = new dir_ent_t();
   //read chunks of 32b as dir_ent_t
   for(int i = 0; i<dirSize; i+=32){
-    memcpy(dir, buf+(32*i), sizeof(dir_ent_t));
+    memcpy(dir, buf+(i), sizeof(dir_ent_t));
     if(dir->name == name){
-      return dir->inum;
+      delete inode;
+      int inum = dir->inum;
+      delete dir;
+      return inum;
     }
   }
   delete inode;
