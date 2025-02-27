@@ -90,11 +90,11 @@ int LocalFileSystem::lookup(int parentInodeNumber, string name) {
   //error checking
   if(stat(parentInodeNumber, inode)==EINVALIDINODE) {
     delete inode;
-    return EINVALIDINODE;
+    return -EINVALIDINODE;
   }
   if(inode->type != UFS_DIRECTORY){ 
     delete inode;
-    return ENOTFOUND;
+    return -ENOTFOUND;
   }
 
 
@@ -113,7 +113,7 @@ int LocalFileSystem::lookup(int parentInodeNumber, string name) {
   }
   delete inode;
   delete dir;
-  return ENOTFOUND;
+  return -ENOTFOUND;
 }
 
 /**
@@ -132,23 +132,25 @@ int LocalFileSystem::stat(int inodeNumber, inode_t *inode) {
   //max inodes
   if(inodeNumber >= super->num_inodes || inodeNumber < 0){
     delete super;
-    return EINVALIDINODE;
+    return -EINVALIDINODE;
   }
 
   //check if inode is valid in bitmap
+  //individual bytes are REVERSED
   int byteBlock = inodeNumber/8;
   int bitPos = inodeNumber%8;
   unsigned char bit = 1 << bitPos;
   unsigned char readBit[((super->num_inodes + 7) / 8)];
   readInodeBitmap(super, readBit);
-  if (!(readBit[byteBlock] & bit)){
+  if (!(readBit[byteBlock] & bit)){ //bitwise and of the two chars
     delete super;
-    return EINVALIDINODE;
+    return -EINVALIDINODE;
   }
 
   //if valid, fill inode struct 
   char buf[UFS_BLOCK_SIZE];
-  int block_num = (super->inode_bitmap_addr) + (inodeNumber/32); //UFS_BLOCK_SIZEB / 128B = 32 inode entries/block
+  //
+  int block_num = (super->inode_region_addr) + (inodeNumber/32); //UFS_BLOCK_SIZEB / 128B = 32 inode entries/block
   int offset = (inodeNumber%32) * sizeof(inode_t);
   (*this->disk).readBlock(block_num, buf); 
   memcpy(inode, buf+offset, sizeof(inode_t));
@@ -171,13 +173,19 @@ int LocalFileSystem::stat(int inodeNumber, inode_t *inode) {
 
 int LocalFileSystem::read(int inodeNumber, void *buffer, int size) {
   inode_t *inode= new inode_t();
-  if(stat(inodeNumber, inode)==EINVALIDINODE) return EINVALIDINODE; 
+  if(stat(inodeNumber, inode)==EINVALIDINODE) {
+    delete inode;
+    return -EINVALIDINODE; 
+  }
   
   char buf[UFS_BLOCK_SIZE];
 
   unsigned int *direct = inode->direct;
 
-  if (size>inode->size || size == 0) return EINVALIDSIZE;
+  if (size>inode->size || size == 0){
+    delete inode;
+    return -EINVALIDSIZE;
+  }
 
   //calculate # blocks to read
   int num_blocks = (size+(UFS_BLOCK_SIZE-1))/UFS_BLOCK_SIZE;
@@ -194,6 +202,7 @@ int LocalFileSystem::read(int inodeNumber, void *buffer, int size) {
     memcpy(static_cast<char*>(buffer) + (i * UFS_BLOCK_SIZE), buf, UFS_BLOCK_SIZE);
 
   }
+  delete inode;
   return size;
 }
 
