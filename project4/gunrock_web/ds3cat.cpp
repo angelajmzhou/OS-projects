@@ -43,11 +43,9 @@ int main(int argc, char *argv[]) {
   LocalFileSystem *fileSystem = new LocalFileSystem(disk);
   int inodeNumber = stoi(argv[2]);
 
-  cout<<"File blocks"<<endl;
-
   inode_t *inode = new inode_t();
   if(fileSystem->stat(inodeNumber, inode)!=0){
-    cout<<"Error reading file"<<endl;
+    cerr<<"Error reading file"<<endl;
     delete fileSystem;
     delete disk;
     delete inode;
@@ -57,12 +55,14 @@ int main(int argc, char *argv[]) {
   int numBlocks = (inode->size+UFS_BLOCK_SIZE-1)/UFS_BLOCK_SIZE;
 
   if(inode->type == UFS_DIRECTORY){
-    cout<<"Error reading file"<<endl;
+    cerr<<"Error reading file"<<endl;
     delete fileSystem;
     delete disk;
     delete inode;
     return 1;
   }
+
+  cout<<"File blocks"<<endl;
 
   unsigned int *direct = inode->direct;
 
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     cout<<direct[i]<<endl;
   }
 
-  cout<<"\n\nFile data"<<endl;
+  cout<<"\nFile data"<<endl;
 
   char buf[UFS_BLOCK_SIZE];
   int last_bytes = inode->size%UFS_BLOCK_SIZE?inode->size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
