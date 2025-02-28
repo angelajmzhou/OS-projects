@@ -439,6 +439,9 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
    * (because you can't write to directories).
    */
 int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
+
+  //account for allocating more data blocks HERE
+  
   inode_t *inode= new inode_t();
   if(stat(inodeNumber, inode)==EINVALIDINODE) {
     delete inode;

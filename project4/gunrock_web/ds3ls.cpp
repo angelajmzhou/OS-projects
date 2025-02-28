@@ -60,11 +60,9 @@ int main(int argc, char *argv[]) {
         cerr<<"Directory not found"<<endl;
         delete fileSystem;
         delete disk;
-
         return 1;
       }
     }
-
   }
 
   inode_t *inode = new inode_t();
