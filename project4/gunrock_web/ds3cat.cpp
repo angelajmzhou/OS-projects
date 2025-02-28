@@ -79,6 +79,8 @@ int main(int argc, char *argv[]) {
     disk->readBlock(direct[i], buf);
     if(i==numBlocks-1){
       write(STDOUT_FILENO, buf, last_bytes);
+      char null_terminator = '\0';
+      write(STDOUT_FILENO, &null_terminator, 1);
       break;
     }
     write(STDOUT_FILENO, buf, UFS_BLOCK_SIZE);
