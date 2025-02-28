@@ -488,6 +488,101 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
    * existing is NOT a failure by our definition. You can't unlink '.' or '..'
    */
 int LocalFileSystem::unlink(int parentInodeNumber, string name) {
+  inode_t *inode = new inode_t();
+  if(stat(parentInodeNumber, inode)==-EINVALIDINODE){
+    delete inode;
+    return -EINVALIDINODE;
+  }else if(inode->type==UFS_REGULAR_FILE){
+    delete inode;
+    return -EINVALIDINODE;
+  }
+  if(name.size()>27){
+    delete inode;
+    return -EINVALIDNAME;
+  }else if(name == "." || name ==".."){
+    delete inode;
+    return -EUNLINKNOTALLOWED;
+  }
+  //if name doesn't exist, return -- doesn't fail!
+  int inode_num = -1;
+  inode_t *dead_inode = new inode_t();
+
+  //delete the dir_entry, scoot everything back
+  char buf[inode->size];
+  //delete the dir_entry, scoot everything back
+  dir_ent_t *dir = new dir_ent_t();
+  bool found = false;
+  //read chunks of 32b as dir_ent_t
+  for(int i = 0; i<inode->size; i+=sizeof(dir_ent_t)){
+    if(found){
+      //copy next entry into current entry
+      memcpy(buf+(i), buf+(i+sizeof(dir_ent_t)), sizeof(dir_ent_t));
+    }else{
+      memcpy(dir, buf+(i), sizeof(dir_ent_t));
+      if(dir->name == name){
+        inode_num = dir->inum;
+        found=true;
+        //overwrite next entry into current entry
+        memcpy(buf+(i), buf+(i+sizeof(dir_ent_t)), sizeof(dir_ent_t));
+        inode->size-=sizeof(dir_ent_t);
+      }
+    }
+  }
+  delete dir;
+  if(inode_num < 0){
+    delete inode;
+    return 0;
+  }
+  if(stat(inode_num, dead_inode)<0){
+    delete inode;
+    delete dead_inode;
+    return -EINVALIDINODE;
+  }
+  //collect all the blocks we need to free
+  vector<int> block_nums;
+  if(dead_inode->type==UFS_DIRECTORY){
+    if(dead_inode->size>2*sizeof(dir_ent_t)){
+      delete inode;
+      delete dead_inode;
+      return -EDIRNOTEMPTY;
+    }
+    block_nums.push_back(dead_inode->direct[0]);
+    }else{
+      int blocks = dead_inode->size / UFS_BLOCK_SIZE;
+      if ((dead_inode->size % UFS_BLOCK_SIZE) != 0) {
+        blocks += 1;
+      }
+      for(int i = 0; i<(blocks); i++){
+        block_nums.push_back(dead_inode->direct[i]);
+      }
+    }
+
+  super_t *super = new super_t();
+  readSuperBlock(super);
+  //read in data bitmap, then "clear" corresponding block bits in loop.
+  int DBS = ((super->num_data + 7) / 8);
+  unsigned char DBM[DBS];
+  readDataBitmap(super, DBM);
+  int pos = 0, i = 0;
+  for(auto block_num:block_nums){
+    pos = block_num/8;
+    i = block_num%8;
+    DBM[pos] = DBM[pos]&0<<i;
+  }
+  writeDataBitmap(super, DBM);
+
+  //read in inode bitmap, "free" corresponding inode and write back.
+  int IBS = ((super->num_inodes + 7) / 8);
+  unsigned char IBM[IBS];
+  readInodeBitmap(super, IBM);
+  pos = inode_num/8;
+  i = inode_num%8;
+  IBM[pos] = IBM[pos]&0<<i;
+  writeInodeBitmap(super, IBM);
+  
+  delete inode;
+  delete dead_inode;
+  delete super;
   return 0;
 }
 
