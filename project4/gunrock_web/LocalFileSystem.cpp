@@ -451,19 +451,77 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
     delete inode;
     return -EINVALIDTYPE;
   }
-
-  char buf[UFS_BLOCK_SIZE];
   unsigned int *direct = inode->direct;
-
   if (size <= 0){
     delete inode;
     return -EINVALIDSIZE;
   }
+  if(size>=30*UFS_BLOCK_SIZE){
+    size = 30*UFS_BLOCK_SIZE;
+  }
   //calculate # blocks to write
   int num_blocks = (size+(UFS_BLOCK_SIZE-1))/UFS_BLOCK_SIZE;
   //calcuate bytes to write to the last block
-  int last_bytes_write = size%UFS_BLOCK_SIZE?size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
+  int prev_blocks = (inode->size+(UFS_BLOCK_SIZE-1))/UFS_BLOCK_SIZE;
+  int block_diff = prev_blocks - num_blocks;
+  super_t *super = new super_t();
+  readSuperBlock(super);
+  //get gnarly! "delete" extraneous blocks
+  
+  if(block_diff>0){//more old blocks than new blocks
+    //read in data bitmap, then "clear" corresponding block bits in loop.
+    int DBS = ((super->num_data + 7) / 8);
+    unsigned char DBM[DBS];
+    readDataBitmap(super, DBM);
+    int pos = 0, i = 0;
+    int block_num;
+    for(int j = prev_blocks-1; j>prev_blocks-block_diff; j--) {
+      block_num = inode->direct[j];
+      pos = block_num/8;
+      i = block_num%8;
+      DBM[pos] = DBM[pos]&0<<i;
+    }
+    writeDataBitmap(super, DBM);
+  }
+  //and assign new blocks if needed...
+  else if(block_diff<0){//more new blocks than old blocks
+    block_diff=-block_diff;
+    deque<int> block_nums;
+    int DBS = ((super->num_data + 7) / 8);
 
+    unsigned char DBM[DBS];
+    readDataBitmap(super, DBM);
+    int pos = 0, i = 0;
+    while(pos<DBS && block_nums.size() < block_diff){
+      if (DBM[pos] == 0xFF) {
+        pos++;
+        continue;
+      }
+      for(i=0;i<8;i++){
+        if(!((1<<i) & DBM[pos])){
+          block_nums.push_back(pos*8+i);
+          DBM[pos] = DBM[pos]|1<<i;
+          if(block_nums.size() == block_diff){break;}
+        }
+      }
+    }
+    if(block_nums.size()<block_diff){
+      //if we can't allocate enough for everything, adjust how much we're writing
+      size =(prev_blocks + block_nums.size())*UFS_BLOCK_SIZE;
+    }
+    writeDataBitmap(super, DBM);
+    //add new blocks to direct
+    for(int k = 0; k<block_nums.size(); k++){
+      inode->direct[prev_blocks+k] = block_nums.front();
+      block_nums.pop_front();
+    }
+  }
+  //in case size has changed (i.e. didn't have enough space to allocate)
+  char buf[UFS_BLOCK_SIZE];
+  num_blocks = (size+(UFS_BLOCK_SIZE-1))/UFS_BLOCK_SIZE;
+  int last_bytes_write = size%UFS_BLOCK_SIZE?size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
+  inode->size = size;
+  
   for (int i = 0; i < num_blocks; i++) {
     if(i==num_blocks-1){
       memcpy(buf, (buffer) + (i * UFS_BLOCK_SIZE), last_bytes_write);
@@ -472,6 +530,12 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
     }
     (*this->disk).writeBlock(direct[i], buf); 
   }
+
+  inode_t inode_buf[super->num_inodes];
+  readInodeRegion(super, inode_buf);
+  inode_buf[inodeNumber] = *inode;
+  writeInodeRegion(super,inode_buf);
+
   delete inode;
   return size;
 }
@@ -579,7 +643,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   i = inode_num%8;
   IBM[pos] = IBM[pos]&0<<i;
   writeInodeBitmap(super, IBM);
-  
+
   delete inode;
   delete dead_inode;
   delete super;
