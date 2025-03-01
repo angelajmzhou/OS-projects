@@ -356,7 +356,7 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
     unsigned char DBM[DBS];
     readDataBitmap(super, DBM);
     pos = 0, i = 0;
-    while(pos<DBS && block_nums.size() < blocksNeeded){
+    while(pos<DBS && static_cast<int>(block_nums.size()) < blocksNeeded){
       if (DBM[pos] == 0xFF) {
         pos++;
         continue;
@@ -365,11 +365,11 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
         if(!((1<<i) & DBM[pos])){
           block_nums.push_back(pos*8+i);
           DBM[pos] = DBM[pos]|1<<i;
-          if(block_nums.size() == blocksNeeded){break;}
+          if(static_cast<int>(block_nums.size()) == blocksNeeded){break;}
         }
       }
     }
-    if(block_nums.size()<blocksNeeded){
+    if(static_cast<int>(block_nums.size())<blocksNeeded){
       delete super;
       delete inode;
       return -ENOTENOUGHSPACE;
@@ -475,15 +475,15 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
     readDataBitmap(super, DBM);
     int pos = 0, i = 0;
     int block_num;
-    for(int j = prev_blocks-1; j>prev_blocks-block_diff; j--) {
+    for(int j = prev_blocks-1; j>=prev_blocks-block_diff; j--) {
       block_num = inode->direct[j];
       pos = block_num/8;
       i = block_num%8;
-      DBM[pos] = DBM[pos]&0<<i;
+      DBM[pos] &= ~(1 << i);
     }
     writeDataBitmap(super, DBM);
   }
-  //and assign new blocks if needed...
+  //and assign new blocks if needed...this is probs where the error is
   else if(block_diff<0){//more new blocks than old blocks
     block_diff=-block_diff;
     deque<int> block_nums;
@@ -492,7 +492,7 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
     unsigned char DBM[DBS];
     readDataBitmap(super, DBM);
     int pos = 0, i = 0;
-    while(pos<DBS && block_nums.size() < block_diff){
+    while(pos<DBS && static_cast<int>(block_nums.size()) < block_diff){
       if (DBM[pos] == 0xFF) {
         pos++;
         continue;
@@ -500,19 +500,20 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
       for(i=0;i<8;i++){
         if(!((1<<i) & DBM[pos])){
           block_nums.push_back(pos*8+i);
-          DBM[pos] = DBM[pos]|1<<i;
-          if(block_nums.size() == block_diff){break;}
+          DBM[pos] = DBM[pos]|1<<i; //this is correct
+          if(static_cast<int>(block_nums.size()) == block_diff){break;}
         }
       }
+      pos++;
     }
-    if(block_nums.size()<block_diff){
+    if(static_cast<int>(block_nums.size())<block_diff){
       //if we can't allocate enough for everything, adjust how much we're writing
       size =(prev_blocks + block_nums.size())*UFS_BLOCK_SIZE;
     }
     writeDataBitmap(super, DBM);
     //add new blocks to direct
-    for(int k = 0; k<block_nums.size(); k++){
-      inode->direct[prev_blocks+k] = block_nums.front();
+    for(int k = 0; k < static_cast<int>(block_nums.size()); k++){
+      inode->direct[prev_blocks+k] = block_nums.front()+super->data_region_addr;
       block_nums.pop_front();
     }
   }
@@ -521,16 +522,18 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
   num_blocks = (size+(UFS_BLOCK_SIZE-1))/UFS_BLOCK_SIZE;
   int last_bytes_write = size%UFS_BLOCK_SIZE?size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
   inode->size = size;
-  
+
+  //do the actual writing!
   for (int i = 0; i < num_blocks; i++) {
     if(i==num_blocks-1){
-      memcpy(buf, (buffer) + (i * UFS_BLOCK_SIZE), last_bytes_write);
+      memcpy(buf, static_cast<const char *>(buffer) + (i * UFS_BLOCK_SIZE), last_bytes_write);
     }else{
-      memcpy(buf, (buffer) + (i * UFS_BLOCK_SIZE), UFS_BLOCK_SIZE);
+      memcpy(buf, static_cast<const char *>(buffer) + (i * UFS_BLOCK_SIZE), UFS_BLOCK_SIZE);
     }
     (*this->disk).writeBlock(direct[i], buf); 
   }
 
+  //write back inode with updated information
   inode_t inode_buf[super->num_inodes];
   readInodeRegion(super, inode_buf);
   inode_buf[inodeNumber] = *inode;
@@ -573,6 +576,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
 
   //delete the dir_entry, scoot everything back
   char buf[inode->size];
+  read(parentInodeNumber, buf, inode->size);
   //delete the dir_entry, scoot everything back
   dir_ent_t *dir = new dir_ent_t();
   bool found = false;
@@ -605,7 +609,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   //collect all the blocks we need to free
   vector<int> block_nums;
   if(dead_inode->type==UFS_DIRECTORY){
-    if(dead_inode->size>2*sizeof(dir_ent_t)){
+    if(dead_inode->size > 2*static_cast<int>(sizeof(dir_ent_t))){
       delete inode;
       delete dead_inode;
       return -EDIRNOTEMPTY;
@@ -641,7 +645,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   readInodeBitmap(super, IBM);
   pos = inode_num/8;
   i = inode_num%8;
-  IBM[pos] = IBM[pos]&0<<i;
+  IBM[pos] &= ~(1 << i);
   writeInodeBitmap(super, IBM);
 
   delete inode;

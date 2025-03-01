@@ -5,7 +5,6 @@
 #include <cstring>
 #include <sstream>
 
-#include "StringUtils.h"
 #include "LocalFileSystem.h"
 #include "Disk.h"
 #include "ufs.h"
@@ -71,7 +70,7 @@ int main(int argc, char *argv[]) {
   if(inode->type == UFS_DIRECTORY){
     int dirSize = inode->size;
     char *buf = new char[dirSize];
-    vector<dir_ent_t> dir_entries(dirSize/sizeof(dir_ent_t));
+    vector<dir_ent_t> dir_entries(dirSize/sizeof(dir_ent_t)); //how could this line be causing stack overflow?
     //read the block containing dir_ent_t
     fileSystem->read(inode_num, buf, dirSize);
     //read chunks of 32b as dir_ent_t

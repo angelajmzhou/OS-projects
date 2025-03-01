@@ -9,7 +9,8 @@
 #include <vector>
 #include <cstring>
 #include <sstream>
-
+#include <cstdlib>
+  
 #include "StringUtils.h"
 #include "LocalFileSystem.h"
 #include "Disk.h"
@@ -32,11 +33,32 @@ int main(int argc, char *argv[]) {
   int dstInode = stoi(argv[3]);
 
   int fd = open(srcFile.c_str(), O_RDONLY);
-  char buf[UFS_BLOCK_SIZE];
-  while(read(fd, buf, 4096)>=0){
-    
+  if(fd==-1){
+    cout<<"Could not write to dst_file"<<endl;
+      exit(1);
   }
-
+  char buf[UFS_BLOCK_SIZE];
+  char *buffer = (char *) malloc(UFS_BLOCK_SIZE); //initial allocation
+  int i = 1;
+  int bytesRead;
+  while((bytesRead = read(fd, buf, UFS_BLOCK_SIZE))>0){
+    if(bytesRead<UFS_BLOCK_SIZE){
+      buffer = (char*) realloc(buffer, (i-1) * UFS_BLOCK_SIZE + bytesRead);
+      memcpy(buffer+(i-1)*UFS_BLOCK_SIZE, buf, bytesRead);
+      break;
+    }
+    buffer = (char*) realloc(buffer, i * UFS_BLOCK_SIZE);  
+    if(buffer == nullptr){
+      cout<<"Could not write to dst_file"<<endl;
+      exit(1);
+    }
+    memcpy(buffer+ (i-1)*UFS_BLOCK_SIZE, buf, UFS_BLOCK_SIZE);
+    i++;
+  }
+  if(fileSystem->write(dstInode, buffer, (i-1)*UFS_BLOCK_SIZE + bytesRead)<0){
+    cout<<"Could not write to dst_file"<<endl;
+    exit(1);
+  }
 
   /*
     The ds3cp utility copies a file from your computer into the disk image using your LocalFileSystem.cpp implementation. 
