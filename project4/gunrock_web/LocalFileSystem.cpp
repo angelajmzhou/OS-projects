@@ -596,6 +596,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
       }
     }
   }
+  write(parentInodeNumber, buf, inode->size);
   delete dir;
   if(inode_num < 0){
     delete inode;
