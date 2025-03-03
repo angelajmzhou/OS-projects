@@ -25,7 +25,6 @@ int main(int argc, char *argv[]) {
   
   if(fileSystem->create(parentInode, UFS_REGULAR_FILE, fileName)<0){
     cerr<<"Error creating file"<<endl;
-
     exit(1);
   }
   delete fileSystem;

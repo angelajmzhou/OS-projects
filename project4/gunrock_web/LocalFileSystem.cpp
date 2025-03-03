@@ -48,7 +48,7 @@ void LocalFileSystem::readDataBitmap(super_t *super, unsigned char *dataBitmap) 
   for (int i = 0; i < super->data_bitmap_len; i++) {
     (*this->disk).readBlock(super->data_bitmap_addr + i, buf); 
     //handle last block
-    if(i==super->inode_bitmap_len-1){
+    if(i== super->data_bitmap_len-1){
       memcpy(dataBitmap + (i * UFS_BLOCK_SIZE), buf, bytes); 
       break;
     }
@@ -59,10 +59,10 @@ void LocalFileSystem::readDataBitmap(super_t *super, unsigned char *dataBitmap) 
 void LocalFileSystem::writeDataBitmap(super_t *super, unsigned char *dataBitmap) {
   char buf[UFS_BLOCK_SIZE]; 
   int total_bytes = (super->num_data + 7) / 8;
-  int last_block_bytes = total_bytes % UFS_BLOCK_SIZE;
+  int last_block_bytes = total_bytes % UFS_BLOCK_SIZE ? total_bytes % UFS_BLOCK_SIZE : UFS_BLOCK_SIZE ;
 
-  for (int i = 0; i < super->inode_bitmap_len; i++) {
-      if (i == super->inode_bitmap_len - 1) {
+  for (int i = 0; i < super->data_bitmap_len; i++) {
+      if (i == super->data_bitmap_len - 1) {
           memset(buf, 0, UFS_BLOCK_SIZE);
           memcpy(buf, dataBitmap + (i * UFS_BLOCK_SIZE), last_block_bytes);
       } else {
@@ -468,7 +468,7 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
     int pos = 0, i = 0;
     int block_num;
     for(int j = prev_blocks-1; j>=prev_blocks-block_diff; j--) {
-      block_num = inode->direct[j];
+      block_num = inode->direct[j] - super->data_region_addr;
       pos = block_num/8;
       i = block_num%8;
       DBM[pos] &= ~(1 << i);
@@ -504,8 +504,11 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
     }
     writeDataBitmap(super, DBM);
     //add new blocks to direct
-    for(int k = 0; k < static_cast<int>(block_nums.size()); k++){
-      inode->direct[prev_blocks+k] = super->data_region_addr + block_nums.front();
+    int k = 0;
+    while(!block_nums.empty()){
+      inode->direct[prev_blocks+k] = super->data_region_addr + block_nums.front(); 
+      k++;
+      block_nums.pop_front();
     }
   }
   //in case size has changed (i.e. didn't have enough space to allocate)
@@ -640,9 +643,11 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   readDataBitmap(super, DBM);
   int pos = 0, i = 0;
   for(auto block_num:block_nums){
+    //NOT here....
+    block_num = block_num - super->data_region_addr;
     pos = block_num/8;
     i = block_num%8;
-    DBM[pos] = DBM[pos]&0<<i;
+    DBM[pos] &= ~(1 << i);
   }
   writeDataBitmap(super, DBM);
 

@@ -71,11 +71,11 @@ int main(int argc, char *argv[]) {
 
   cout<<"\nFile data"<<endl;
 
-  //char buf[UFS_BLOCK_SIZE];
-  //int last_bytes = inode->size%UFS_BLOCK_SIZE?inode->size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
+  // char buf[UFS_BLOCK_SIZE];
+  // int last_bytes = inode->size%UFS_BLOCK_SIZE?inode->size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
 
   // for(int i = 0; i<numBlocks; i++){
-  //   disk->readBlock(direct[i], buf);
+  //   disk->readBlock(inode->direct[i], buf);
   //   if(i==numBlocks-1){
   //     write(STDOUT_FILENO, buf, last_bytes);
   //     //errors out test 9???
