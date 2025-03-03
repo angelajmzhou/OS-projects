@@ -41,3 +41,5 @@ tests-out
 # Executables
 *.exe
 *.app
+
+*.txt
