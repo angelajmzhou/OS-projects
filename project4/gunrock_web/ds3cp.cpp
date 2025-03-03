@@ -34,9 +34,10 @@ int main(int argc, char *argv[]) {
 
   int fd = open(srcFile.c_str(), O_RDONLY);
   if(fd==-1){
-    cout<<"Could not write to dst_file"<<endl;
+    cout<<"cannot open file"<<endl;
       exit(1);
   }
+  
   char buf[UFS_BLOCK_SIZE];
   char *buffer = (char *) malloc(UFS_BLOCK_SIZE); //initial allocation
   int i = 1;
@@ -49,25 +50,30 @@ int main(int argc, char *argv[]) {
     }
     buffer = (char*) realloc(buffer, i * UFS_BLOCK_SIZE);  
     if(buffer == nullptr){
-      cout<<"Could not write to dst_file"<<endl;
+      cout<<"Realloc fail"<<endl;
       exit(1);
     }
     memcpy(buffer+ (i-1)*UFS_BLOCK_SIZE, buf, UFS_BLOCK_SIZE);
     i++;
   }
+  std::cout << "dstInode: " << dstInode << std::endl;
+  std::cout << "buffer size: " << ((i-1) * UFS_BLOCK_SIZE + bytesRead) << " bytes" << std::endl;
+  std::cout << "First few bytes of buffer: ";
+  for (int j = 0; j < std::min(16, (i-1) * UFS_BLOCK_SIZE + bytesRead); j++) { // Print first few bytes
+      printf("%02X ", (unsigned char)buffer[j]);
+  }
+  std::cout << std::endl;
+
   if(fileSystem->write(dstInode, buffer, (i-1)*UFS_BLOCK_SIZE + bytesRead)<0){
     cout<<"Could not write to dst_file"<<endl;
+    free(buffer);
+    close(fd);
     exit(1);
   }
 
-  /*
-    The ds3cp utility copies a file from your computer into the disk image using your LocalFileSystem.cpp implementation. 
-    It takes three command line arguments, the disk image file, the source file from your computer that you want to copy in, 
-    and the inode for the destination file within your disk image.
-    For all errors, print the string Could not write to dst_file to standard error and exit with return code 1. 
-    We will always use files that exist on the computer for testing, 
-    so if you encounter an error opening or reading from the source file you can print any error message that makes sense.
-  */
-
+  free(buffer);
+  close(fd);
+  delete fileSystem;
+  delete disk;
   return 0;
 }

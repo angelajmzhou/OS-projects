@@ -24,7 +24,10 @@ int main(int argc, char *argv[]) {
 
   if(fileSystem->create(parentInode, UFS_DIRECTORY, directory)<0){
     cerr<<"Error creating directory"<<endl;
+
     exit(1);
   }
+  delete fileSystem;
+  delete disk;
   return 0;
 }

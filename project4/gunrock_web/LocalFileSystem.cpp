@@ -369,9 +369,11 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
 
   //once here, we know we have room! add as dir_ent()
   //create an inode OBJ and put data inside!
+
+  //why is this always 10?
   int directInd = inode->size/(UFS_BLOCK_SIZE);
   if(full_dir){
-    directInd++;
+    //cout<<"direct overflow, next block"<<endl;
     inode->direct[directInd] = block_nums.back()+super->data_region_addr;
     block_nums.pop_back();
   }
@@ -398,6 +400,7 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
   strcpy(dirent->name, name.c_str());
   dirent->inum = i_num;
   int blocknum = inode->direct[directInd];
+  //cout<<"direct ind: "<<directInd<<" | read block blocknum: "<<blocknum<<endl;
   disk->readBlock(blocknum, buf);
   memcpy(buf+(inode->size%UFS_BLOCK_SIZE), dirent, sizeof(dir_ent_t));
   inode->size+=sizeof(dir_ent_t);
@@ -526,7 +529,7 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
   readInodeRegion(super, inode_buf);
   inode_buf[inodeNumber] = *inode;
   writeInodeRegion(super,inode_buf);
-
+  delete super;
   delete inode;
   return size;
 }
@@ -559,7 +562,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
     return -EUNLINKNOTALLOWED;
   }
   //if name doesn't exist, return -- doesn't fail!
-  int inode_num = -120;
+  int inode_num = -1;
   inode_t *dead_inode = new inode_t();
 
   //delete the dir_entry, scoot everything back
@@ -585,8 +588,18 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
     }
   }
   //update the directory entries
-  write(parentInodeNumber, buf, inode->size);
-  delete dir;
+  int num_blocks = (inode->size+UFS_BLOCK_SIZE-1)/UFS_BLOCK_SIZE;
+  int rem_bytes = inode->size%UFS_BLOCK_SIZE;
+  char diskbuf[UFS_BLOCK_SIZE];
+  for(int w = 0; w<num_blocks-1; w++){
+    memcpy(diskbuf, buf, UFS_BLOCK_SIZE);
+    disk->writeBlock(inode->direct[w], diskbuf);
+  }
+  if(num_blocks>0){
+    memcpy(diskbuf, buf, rem_bytes);
+    disk->writeBlock(inode->direct[num_blocks-1], diskbuf);
+  }
+  
   if(inode_num < 0){
     delete inode;
     delete dead_inode;
@@ -648,4 +661,3 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   delete super;
   return 0;
 }
-

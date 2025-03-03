@@ -50,7 +50,7 @@ int Disk::numberOfBlocks() {
 
 void Disk::readBlock(int blockNumber, void *buffer) {
   if (blockNumber < 0 || blockNumber >= this->numberOfBlocks()) {
-    cerr << "Invalid block number " << blockNumber << endl;
+    cerr << "Invalid block number" << blockNumber << endl;
     exit(1);
   }
 
@@ -79,7 +79,7 @@ void Disk::readBlock(int blockNumber, void *buffer) {
 
 void Disk::writeBlock(int blockNumber, void *buffer) {  
   if (blockNumber < 0 || blockNumber >= this->numberOfBlocks()) {
-    cerr << "Invalid block number " << blockNumber << endl;
+    cerr << "Invalid block number" << blockNumber << endl;
     exit(1);
   }
 

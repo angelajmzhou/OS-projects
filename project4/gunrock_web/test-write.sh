@@ -34,6 +34,7 @@ for i in $(seq 1 128); do
   dirName="f$i"
   ./ds3mkdir test.img 0 "$dirName"
 done
+echo -e "done creating folders, remove..."
 
 ./ds3rm test.img 0 f5
 ./ds3rm test.img 0 f34
@@ -45,6 +46,8 @@ echo -e "Copying empty.txt into dummy.txt"
 ./ds3cp test.img empty.txt 1
 ./ds3bits test.img
 ./ds3cat test.img 1
+
+# inode bitmap is fine, data bitmap does nto match...
 
 echo -e "Copying mid.txt into dummy.txt"
 ./ds3cp test.img mid.txt 1

@@ -64,28 +64,27 @@ int main(int argc, char *argv[]) {
 
   cout<<"File blocks"<<endl;
 
-  unsigned int *direct = inode->direct;
 
   for(int i = 0; i<numBlocks; i++){
-    cout<<direct[i]<<endl;
+    cout<<inode->direct[i]<<endl;
   }
 
   cout<<"\nFile data"<<endl;
 
-  char buf[UFS_BLOCK_SIZE];
-  int last_bytes = inode->size%UFS_BLOCK_SIZE?inode->size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
+  //char buf[UFS_BLOCK_SIZE];
+  //int last_bytes = inode->size%UFS_BLOCK_SIZE?inode->size%UFS_BLOCK_SIZE:UFS_BLOCK_SIZE;
 
-  for(int i = 0; i<numBlocks; i++){
-    disk->readBlock(direct[i], buf);
-    if(i==numBlocks-1){
-      write(STDOUT_FILENO, buf, last_bytes);
-      //errors out test 9???
-      //char null_terminator = '\0';
-      //write(STDOUT_FILENO, &null_terminator, 1);
-      break;
-    }
-    write(STDOUT_FILENO, buf, UFS_BLOCK_SIZE);
-  }
+  // for(int i = 0; i<numBlocks; i++){
+  //   disk->readBlock(direct[i], buf);
+  //   if(i==numBlocks-1){
+  //     write(STDOUT_FILENO, buf, last_bytes);
+  //     //errors out test 9???
+  //     //char null_terminator = '\0';
+  //     //write(STDOUT_FILENO, &null_terminator, 1);
+  //     break;
+  //   }
+  //   write(STDOUT_FILENO, buf, UFS_BLOCK_SIZE);
+  // }
 
   delete fileSystem;
   delete disk;
