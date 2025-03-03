@@ -73,7 +73,7 @@ void Disk::readBlock(int blockNumber, void *buffer) {
     cerr << "Could not read file" << endl;
     exit(1);
   }
-
+  
   close(fd);
 }
 
