@@ -119,9 +119,9 @@ int LocalFileSystem::lookup(int parentInodeNumber, string name) {
     delete inode;
     return -EINVALIDINODE;
   }
-  if(inode->type != UFS_DIRECTORY){ 
+  if (inode->type != UFS_DIRECTORY) {
     delete inode;
-    return -ENOTFOUND;
+    return -EINVALIDINODE; 
   }
 
   int dirSize = inode->size;
@@ -205,7 +205,7 @@ int LocalFileSystem::stat(int inodeNumber, inode_t *inode) {
 
 int LocalFileSystem::read(int inodeNumber, void *buffer, int size) {
   inode_t *inode= new inode_t();
-  if(stat(inodeNumber, inode)==EINVALIDINODE) {
+  if(stat(inodeNumber, inode)==-EINVALIDINODE) {
     delete inode;
     return -EINVALIDINODE; 
   }
@@ -276,7 +276,8 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
   inode_t *inode = new inode_t();
   //parent inode is invalid (error from lookup), return
   if(inode_exist==-EINVALIDINODE){
-    //cout<<"invalid inode"<<endl;
+    //NOT an error if the name doesn't already exist
+    delete inode;
     return -EINVALIDINODE;
   }
   //found in parent directory, check if valid
@@ -301,6 +302,7 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
   super_t *super = new super_t();
   readSuperBlock(super);
 
+  //accounted for in earlier lookup
   stat(parentInodeNumber, inode); 
 
   if(inode->size==30*UFS_BLOCK_SIZE){
@@ -437,7 +439,7 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
 
   //account for allocating more data blocks HERE
   inode_t *inode= new inode_t();
-  if(stat(inodeNumber, inode)==EINVALIDINODE) {
+  if(stat(inodeNumber, inode)==-EINVALIDINODE) {
     delete inode;
     return -EINVALIDINODE; 
   }
@@ -558,7 +560,7 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
 int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   inode_t *parent_inode= new inode_t();
   //parent parent_inodedoesn't exist or isn't a directory
-  if(stat(parentInodeNumber, parent_inode)==-EINVALIDINODE){
+  if(stat(parentInodeNumber, parent_inode)== -EINVALIDINODE){
     delete parent_inode;
     return -EINVALIDINODE;
   }else if(parent_inode->type==UFS_REGULAR_FILE){
@@ -611,7 +613,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
     parent_inode->size -= sizeof(dir_ent_t);
   }
 
-  if(stat(inode_num, dead_inode)<0){
+  if(stat(inode_num, dead_inode) == -EINVALIDINODE){
     delete parent_inode;
     delete dead_inode;
     return -EINVALIDINODE;
