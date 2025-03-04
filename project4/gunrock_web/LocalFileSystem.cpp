@@ -294,7 +294,7 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
     }
     //already exists and correct type-- success!
     delete inode;
-    return 0;
+    return inode_exist;
   }
 
   //start allocating space.
@@ -585,13 +585,14 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
 
   int dir_count = parent_inode->size / sizeof(dir_ent_t);
   int inode_num = -1;
+  int entry_num;
   vector<int> block_nums;
-
   for (int j = 0; j < dir_count; j++) {
     dir_ent_t entry;
     memcpy(&entry, buf + j * sizeof(dir_ent_t), sizeof(dir_ent_t));
     
     if (string(entry.name) == name) {
+      entry_num = j;
       inode_num = entry.inum;
       break;
     }
@@ -601,10 +602,10 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
     delete dead_inode;
     return 0; 
   } else {
-    int entriesAfter = (dir_count-1) - inode_num; 
+    int entriesAfter = (dir_count-1) - entry_num; 
     if (entriesAfter > 0) {
-      memmove(buf + inode_num * sizeof(dir_ent_t),
-              buf + (inode_num + 1) * sizeof(dir_ent_t),
+      memmove(buf + entry_num * sizeof(dir_ent_t),
+              buf + (entry_num + 1) * sizeof(dir_ent_t),
               entriesAfter * sizeof(dir_ent_t));
     }
     parent_inode->size -= sizeof(dir_ent_t);

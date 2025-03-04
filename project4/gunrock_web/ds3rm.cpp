@@ -24,7 +24,9 @@ int main(int argc, char *argv[]) {
 
   if(fileSystem->unlink(parentInode, entryName)!=0){
     cerr<<"Error removing entry"<<endl;
-    exit(1);
+    delete fileSystem;
+    delete disk;
+    return 1;
   }
   delete fileSystem;
   delete disk;
