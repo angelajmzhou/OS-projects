@@ -50,6 +50,8 @@ int main(int argc, char *argv[]) {
     }
     buffer = (char*) realloc(buffer, i * UFS_BLOCK_SIZE);  
     if(buffer == nullptr){
+      free(buffer);
+      close(fd);
       cout<<"Could not write to dst_file"<<endl;
       exit(1);
     }

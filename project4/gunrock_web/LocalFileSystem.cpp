@@ -400,7 +400,6 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
   strcpy(dirent->name, name.c_str());
   dirent->inum = i_num;
   int blocknum = inode->direct[directInd];
-  //cout<<"direct ind: "<<directInd<<" | read block blocknum: "<<blocknum<<endl;
   disk->readBlock(blocknum, buf);
   memcpy(buf+(inode->size%UFS_BLOCK_SIZE), dirent, sizeof(dir_ent_t));
   inode->size+=sizeof(dir_ent_t);
@@ -416,7 +415,7 @@ int LocalFileSystem::create(int parentInodeNumber, int type, string name) {
   delete new_inode;
   delete super;
   delete dirent;
-  return 0;
+  return i_num;
 }
   /**
    * Write the contents of a file.
@@ -441,10 +440,11 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
     delete inode;
     return -EINVALIDTYPE;
   }
-  if (size <= 0){
+  if (size < 0){
     delete inode;
     return -EINVALIDSIZE;
   }
+  //check if we're exceeding array size
   if(size>=30*UFS_BLOCK_SIZE){
     size = 30*UFS_BLOCK_SIZE;
   }
@@ -549,33 +549,38 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
    * existing is NOT a failure by our definition. You can't unlink '.' or '..'
    */
 int LocalFileSystem::unlink(int parentInodeNumber, string name) {
-  inode_t *inode = new inode_t();
-  if(stat(parentInodeNumber, inode)==-EINVALIDINODE){
-    delete inode;
+  inode_t *parent_inode= new inode_t();
+  //parent parent_inodedoesn't exist or isn't a directory
+  if(stat(parentInodeNumber, parent_inode)==-EINVALIDINODE){
+    delete parent_inode;
     return -EINVALIDINODE;
-  }else if(inode->type==UFS_REGULAR_FILE){
-    delete inode;
+  }else if(parent_inode->type==UFS_REGULAR_FILE){
+    delete parent_inode;
     return -EINVALIDINODE;
   }
+  //invalid name
   if(name.size()>27){
-    delete inode;
+    delete parent_inode;
     return -EINVALIDNAME;
-  }else if(name == "." || name ==".."){
-    delete inode;
+  }
+  //unlink not allowed
+  else if(name == "." || name ==".."){
+    delete parent_inode;
     return -EUNLINKNOTALLOWED;
   }
   //if name doesn't exist, return -- doesn't fail!
-  int inode_num = -1;
+  int inode_num;
   inode_t *dead_inode = new inode_t();
 
   //delete the dir_entry, scoot everything back
-  char buf[inode->size];
-  read(parentInodeNumber, buf, inode->size);
-  //delete the dir_entry, scoot everything back
+  char buf[parent_inode->size];
+  //read the dir entries into buf
+  read(parentInodeNumber, buf, parent_inode->size);
+
   dir_ent_t *dir = new dir_ent_t();
   bool found = false;
   //read chunks of 32b as dir_ent_t
-  for(int i = 0; i<inode->size; i+=sizeof(dir_ent_t)){
+  for(int i = 0; i<parent_inode->size; i+=sizeof(dir_ent_t)){
     if(found){
       //copy next entry into current entry
       memcpy(buf+(i), buf+(i+sizeof(dir_ent_t)), sizeof(dir_ent_t));
@@ -586,31 +591,33 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
         found=true;
         //overwrite next entry into current entry
         memcpy(buf+(i), buf+(i+sizeof(dir_ent_t)), sizeof(dir_ent_t));
-        inode->size-=sizeof(dir_ent_t);
+        parent_inode->size-=sizeof(dir_ent_t);
       }
     }
   }
-  //update the directory entries
-  int num_blocks = (inode->size+UFS_BLOCK_SIZE-1)/UFS_BLOCK_SIZE;
-  int rem_bytes = inode->size%UFS_BLOCK_SIZE;
-  char diskbuf[UFS_BLOCK_SIZE];
-  for(int w = 0; w<num_blocks-1; w++){
-    memcpy(diskbuf, buf, UFS_BLOCK_SIZE);
-    disk->writeBlock(inode->direct[w], diskbuf);
-  }
-  if(num_blocks>0){
-    memcpy(diskbuf, buf, rem_bytes);
-    disk->writeBlock(inode->direct[num_blocks-1], diskbuf);
-  }
-  
-  if(inode_num < 0){
-    delete inode;
+
+  if(!found){
+    delete parent_inode;
     delete dead_inode;
     delete dir;
-    return 0;
+    return 0; //name not existing is not a failure, just don't do anything
   }
+  //update the directory entries
+  int num_blocks = (parent_inode->size+UFS_BLOCK_SIZE-1)/UFS_BLOCK_SIZE;
+  int rem_bytes = parent_inode->size%UFS_BLOCK_SIZE;
+  char diskbuf[UFS_BLOCK_SIZE];
+
+  for(int w = 0; w<num_blocks-1; w++){
+    memcpy(diskbuf, buf+(w*UFS_BLOCK_SIZE), UFS_BLOCK_SIZE);
+    disk->writeBlock(parent_inode->direct[w], diskbuf);
+  }
+  if (num_blocks > 0) {
+    memcpy(diskbuf, buf + ((num_blocks - 1) * UFS_BLOCK_SIZE), rem_bytes);
+    disk->writeBlock(parent_inode->direct[num_blocks - 1], diskbuf);
+  }
+  
   if(stat(inode_num, dead_inode)<0){
-    delete inode;
+    delete parent_inode;
     delete dead_inode;
     delete dir;
     return -EINVALIDINODE;
@@ -619,7 +626,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   vector<int> block_nums;
   if(dead_inode->type==UFS_DIRECTORY){
     if(dead_inode->size > 2*static_cast<int>(sizeof(dir_ent_t))){
-      delete inode;
+      delete parent_inode;
       delete dead_inode;
       delete dir;
       return -EDIRNOTEMPTY;
@@ -660,7 +667,12 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   IBM[pos] &= ~(1 << i);
   writeInodeBitmap(super, IBM);
 
-  delete inode;
+  inode_t inode_buf[super->num_inodes];
+  readInodeRegion(super, inode_buf);
+  inode_buf[parentInodeNumber] = *parent_inode;
+  writeInodeRegion(super,inode_buf);
+
+  delete parent_inode;
   delete dead_inode;
   delete dir;
   delete super;
