@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     }
     for (auto token : tokens) {
       inode_num = fileSystem->lookup(inode_num, token); //start at root of filesystem
-      if (inode_num == -EINVALIDINODE || inode_num == -ENOTFOUND){
+      if (inode_num < 0){
         cerr<<"Directory not found"<<endl;
         delete fileSystem;
         delete disk;
@@ -65,7 +65,13 @@ int main(int argc, char *argv[]) {
   }
 
   inode_t *inode = new inode_t();
-  fileSystem->stat(inode_num, inode);
+  if(fileSystem->stat(inode_num, inode)!=0){
+    cerr<<"Directory not found (stat)"<<endl;
+        delete fileSystem;
+        delete disk;
+        delete inode;
+        return 1;
+  }
 
   if(inode->type == UFS_DIRECTORY){
     int dirSize = inode->size;

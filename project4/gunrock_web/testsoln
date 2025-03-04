@@ -71,7 +71,7 @@ File blocks
 44
 87
 120
-137  -- 140???
+137 
 
 Copying small.txt into dummy.txt
 Super
@@ -114,6 +114,4 @@ File blocks
 137
 140
 141
-142 #now allocating one extra? 143?
-message.txt
-5 KB
+142 

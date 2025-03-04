@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
   int fd = open(srcFile.c_str(), O_RDONLY);
   if(fd==-1){
-    cout<<"Could not write to dst_file"<<endl;
+    cerr<<"Could not write to dst_file"<<endl;
       exit(1);
   }
 
@@ -45,6 +45,12 @@ int main(int argc, char *argv[]) {
   while((bytesRead = read(fd, buf, UFS_BLOCK_SIZE))>0){
     if(bytesRead<UFS_BLOCK_SIZE){
       buffer = (char*) realloc(buffer, (i-1) * UFS_BLOCK_SIZE + bytesRead);
+      if(buffer == nullptr){
+        free(buffer);
+        close(fd);
+        cerr<<"Could not write to dst_file"<<endl;
+        exit(1);
+      }
       memcpy(buffer+(i-1)*UFS_BLOCK_SIZE, buf, bytesRead);
       break;
     }
@@ -52,16 +58,22 @@ int main(int argc, char *argv[]) {
     if(buffer == nullptr){
       free(buffer);
       close(fd);
-      cout<<"Could not write to dst_file"<<endl;
+      cerr<<"Could not write to dst_file"<<endl;
       exit(1);
     }
     memcpy(buffer+ (i-1)*UFS_BLOCK_SIZE, buf, UFS_BLOCK_SIZE);
     i++;
   }
 
+  if(bytesRead<0){
+    free(buffer);
+      close(fd);
+      cerr<<"Could not write to dst_file"<<endl;
+      exit(1);
+  }
 
   if(fileSystem->write(dstInode, buffer, (i-1)*UFS_BLOCK_SIZE + bytesRead)<0){
-    cout<<"Could not write to dst_file"<<endl;
+    cerr<<"Could not write to dst_file"<<endl;
     free(buffer);
     close(fd);
     exit(1);
