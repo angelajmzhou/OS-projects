@@ -560,7 +560,7 @@ int LocalFileSystem::write(int inodeNumber, const void *buffer, int size) {
 int LocalFileSystem::unlink(int parentInodeNumber, string name) {
   inode_t *parent_inode= new inode_t();
   //parent parent_inodedoesn't exist or isn't a directory
-  if(stat(parentInodeNumber, parent_inode)== -EINVALIDINODE){
+  if(stat(parentInodeNumber, parent_inode) < 0){
     delete parent_inode;
     return -EINVALIDINODE;
   }else if(parent_inode->type==UFS_REGULAR_FILE){
@@ -577,7 +577,6 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
     delete parent_inode;
     return -EUNLINKNOTALLOWED;
   }
-  //if name doesn't exist, return -- doesn't fail!
   inode_t *dead_inode = new inode_t();
 
   //delete the dir_entry, scoot everything back
@@ -599,6 +598,7 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
       break;
     }
   }
+  //if name doesn't exist, return w/ success -- doesn't fail!
   if (inode_num < 0) {
     delete parent_inode;
     delete dead_inode;
@@ -613,10 +613,15 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
     parent_inode->size -= sizeof(dir_ent_t);
   }
 
-  if(stat(inode_num, dead_inode) == -EINVALIDINODE){
+  if(stat(inode_num, dead_inode) < 0){
     delete parent_inode;
     delete dead_inode;
     return -EINVALIDINODE;
+  }
+  if(dead_inode->type == UFS_DIRECTORY && dead_inode->size > 2*static_cast<int>(sizeof(dir_ent_t))){
+    delete parent_inode;
+    delete dead_inode;
+    return -EDIRNOTEMPTY;
   }
   //update the directory entries
   int num_blocks = (parent_inode->size+UFS_BLOCK_SIZE-1)/UFS_BLOCK_SIZE;
@@ -641,11 +646,6 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
 
   //collect all the blocks we need to free
   if(dead_inode->type==UFS_DIRECTORY){
-    if(dead_inode->size > 2*static_cast<int>(sizeof(dir_ent_t))){
-      delete parent_inode;
-      delete dead_inode;
-      return -EDIRNOTEMPTY;
-    }
     //because it's an empty directory
     block_nums.push_back(dead_inode->direct[0]);
     }
@@ -659,7 +659,6 @@ int LocalFileSystem::unlink(int parentInodeNumber, string name) {
         block_nums.push_back(dead_inode->direct[i]);
       }
     }
-
 
   //read in data bitmap, then "clear" corresponding block bits in loop.
   int DBS = ((super->num_data + 7) / 8);
